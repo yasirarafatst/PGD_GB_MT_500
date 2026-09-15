@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PGD-GB 500 Model Test — Updated</title>
+<title>PGD-GB 500 Model Test</title>
 <style>
 :root{--bg:#f4f7fb;--card:#fff;--ink:#182230;--muted:#657184;--accent:#0b63ce;--danger:#c62828;--ok:#147a4b;--border:#dce3ec}
 *{box-sizing:border-box} body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink)}
@@ -23,11 +23,19 @@ button{border:0;border-radius:10px;padding:12px 17px;font-weight:800;cursor:poin
 table{width:100%;border-collapse:collapse} th,td{border-bottom:1px solid var(--border);padding:9px;text-align:left;font-size:14px}
 .good{color:var(--ok);font-weight:800} .bad{color:var(--danger);font-weight:800} .bar{height:10px;background:#e9eef5;border-radius:10px;overflow:hidden} .bar i{display:block;height:100%;background:var(--accent)}
 .stickySubmit{position:sticky;bottom:12px;z-index:15;display:flex;justify-content:flex-end;padding-top:10px}
-.small{font-size:13px;color:var(--muted)} @media(max-width:760px){.grid,.resultGrid{grid-template-columns:1fr} header{position:static}}
+.small{font-size:13px;color:var(--muted)}
+.opt.correct{background:#e8f7ef;border-color:#147a4b;color:#11613d}
+.opt.wrong{background:#fdecec;border-color:#c62828;color:#a61f1f}
+.opt.correct::after{content:" ✓ Correct";margin-left:auto;font-weight:900;color:#147a4b}
+.opt.wrong::after{content:" ✕ Wrong";margin-left:auto;font-weight:900;color:#c62828}
+.answerFeedback{margin-top:12px;padding:12px 14px;border-radius:10px;background:#f5f8fc;border-left:4px solid var(--accent)}
+.answerFeedback.correctFeedback{background:#eef9f3;border-left-color:var(--ok)}
+.answerFeedback.wrongFeedback{background:#fff1f1;border-left-color:var(--danger)}
+.submitBanner{margin:14px 0;padding:13px 16px;border-radius:12px;background:#edf5ff;border:1px solid #bfd8f5;font-weight:800} @media(max-width:760px){.grid,.resultGrid{grid-template-columns:1fr} header{position:static}}
 </style>
 </head>
 <body>
-<header><h1>PGD-GB 500 Model Test</h1><p>50 Questions • 50 Minutes • One-page test • One-time answer lock • Individual assessment</p></header>
+<header><h1>PGD-GB 500 Model Test</h1><p>50 Questions • 60 Minutes • One-page test • One-time answer lock • Fixed −0.25 negative marking</p></header>
 <div class="wrap">
 <section id="join" class="card">
 <h2>Candidate Registration</h2>
@@ -36,6 +44,7 @@ table{width:100%;border-collapse:collapse} th,td{border-bottom:1px solid var(--b
 <div><label>Full Name</label><input id="name" placeholder="Enter full name"></div>
 <div><label>Phone Number</label><input id="phone" placeholder="01XXXXXXXXX"></div>
 <div><label>Test Number (1–500)</label><input id="testNo" type="number" min="1" max="500" value="1"></div>
+<div><label>Negative Marking</label><input value="−0.25 mark per wrong answer" disabled style="font-weight:800;background:#f3f6fa"></div>
 </div>
 <p><label><input id="consent" type="checkbox" style="width:auto"> I understand this is a model/expected practice simulator, not an official IBA question paper.</label></p>
 <button class="primary" onclick="joinTest()">Join Test</button>
@@ -44,7 +53,7 @@ table{width:100%;border-collapse:collapse} th,td{border-bottom:1px solid var(--b
 <section id="test" class="hidden">
 <div class="card topbar">
 <div><b id="candidate"></b><div class="small" id="testLabel"></div></div>
-<div class="timer" id="timer">50:00</div>
+<div class="timer" id="timer">60:00</div>
 </div>
 <div class="card">
 <div class="stats"><span class="pill">Total: 50</span><span class="pill">English: 10</span><span class="pill">Quantitative: 10</span><span class="pill">Analytical: 10</span><span class="pill">Business: 10</span><span class="pill">RMG: 10</span><span class="pill" id="answeredPill">Answered: 0/50</span></div>
@@ -105,6 +114,7 @@ function renderQuestions(){
     <div class="meta">${q.category} • ${q.area} • ${q.topic} • ${q.type}</div>
     <div class="opts">${q.options.map((o,j)=>`<label class="opt" id="o${i}_${j}"><input type="radio" name="q${i}" value="${j}" onchange="lockAnswer(${i},${j})"> <span>${String.fromCharCode(65+j)}. ${esc(o)}</span></label>`).join("")}</div>
     <div class="lock" id="lock${i}"></div>
+    <div class="answerFeedback hidden" id="feedback${i}"></div>
   </div>`).join("");
 }
 function lockAnswer(i,j){
@@ -123,19 +133,72 @@ function submitTest(auto){
   if(state.submitted)return;
   const unanswered=50-Object.keys(state.answers).length;
   if(!auto && !confirm(unanswered?`You have ${unanswered} unanswered question(s). Submit now? Answers already locked cannot be changed.`:"Submit your final test?")) return;
-  state.submitted=true;clearInterval(state.timer);
+
+  state.submitted=true;
+  clearInterval(state.timer);
+
   const wrong=state.items.reduce((n,q,i)=>n+(state.answers[i]!==undefined&&state.answers[i]!==q.answer?1:0),0);
   const correct=state.items.reduce((n,q,i)=>n+(state.answers[i]===q.answer?1:0),0);
-  const negative=wrong*state.negative;
+  const negative=wrong*0.25;
   const raw=Math.max(0,correct-negative), pct=raw/50*100;
-  const result={candidate:state.candidate,phone:state.phone,testNo:state.testNo,date:new Date().toLocaleString(),used:Math.round((Date.now()-state.started)/60000),correct,wrong,unanswered,negative,score:raw,pct,items:state.items.map((q,i)=>({id:q.id,selected:state.answers[i]}))};
-  const hist=JSON.parse(localStorage.getItem("pgdgb_results")||"[]");hist.push(result);localStorage.setItem("pgdgb_results",JSON.stringify(hist));
-  document.getElementById("test").classList.add("hidden");document.getElementById("results").classList.remove("hidden");renderResult(result);
+
+  const result={
+    candidate:state.candidate,phone:state.phone,testNo:state.testNo,
+    date:new Date().toLocaleString(),
+    used:Math.round((Date.now()-state.started)/60000),
+    correct,wrong,unanswered,negative,score:raw,pct,
+    items:state.items.map((q,i)=>({id:q.id,selected:state.answers[i]}))
+  };
+
+  const hist=JSON.parse(localStorage.getItem("pgdgb_results")||"[]");
+  hist.push(result);
+  localStorage.setItem("pgdgb_results",JSON.stringify(hist));
+
+  // Keep the answer sheet visible and immediately show the correct/wrong answers.
+  state.items.forEach((q,i)=>{
+    const selected=state.answers[i];
+    const correctOpt=document.getElementById(`o${i}_${q.answer}`);
+    if(correctOpt) correctOpt.classList.add("correct");
+
+    if(selected!==undefined && selected!==q.answer){
+      const wrongOpt=document.getElementById(`o${i}_${selected}`);
+      if(wrongOpt) wrongOpt.classList.add("wrong");
+    }
+
+    document.querySelectorAll(`#q${i} .opt input`).forEach(x=>x.disabled=true);
+
+    const fb=document.getElementById(`feedback${i}`);
+    if(!fb) return;
+
+    const correctText=`${String.fromCharCode(65+q.answer)}. ${esc(q.options[q.answer])}`;
+    if(selected===undefined){
+      fb.className="answerFeedback wrongFeedback";
+      fb.innerHTML=`<b>Unanswered</b><br>Correct answer: <b>${correctText}</b><br><span class="small"><b>Why:</b> ${esc(q.explanation)}</span>`;
+    }else if(selected===q.answer){
+      fb.className="answerFeedback correctFeedback";
+      fb.innerHTML=`<b>Correct answer.</b> ${correctText}<br><span class="small"><b>Why:</b> ${esc(q.explanation)}</span>`;
+    }else{
+      const yourText=`${String.fromCharCode(65+selected)}. ${esc(q.options[selected])}`;
+      fb.className="answerFeedback wrongFeedback";
+      fb.innerHTML=`<b>Wrong answer.</b> Your answer: <b>${yourText}</b><br>Correct answer: <b>${correctText}</b><br><span class="small"><b>Why:</b> ${esc(q.explanation)}</span>`;
+    }
+  });
+
+  document.getElementById("submitBanner")?.remove();
+  const questions=document.getElementById("questions");
+  questions.insertAdjacentHTML("beforebegin",
+    `<div id="submitBanner" class="submitBanner">✓ Test submitted — wrong answers are highlighted in red, correct answers in green, and explanations are shown below each question. Negative marking: −0.25 per wrong answer.</div>`
+  );
+
+  document.getElementById("results").classList.remove("hidden");
+  renderResult(result);
+  document.getElementById("results").scrollIntoView({behavior:"smooth",block:"start"});
 }
+
 function readiness(p){if(p>=85)return["Excellent","You are close to final-test readiness. Continue with timed mocks and refine minor gaps."];if(p>=75)return["Strong","Good preparation. Focus on speed, accuracy and remaining weak topics."];if(p>=65)return["Developing","Your base is workable. Target weak topics and take more timed tests."];if(p>=50)return["Needs Improvement","Revise fundamentals before increasing test difficulty."];return["Foundation Revision Required","Rebuild core concepts, then return to timed practice."];}
 function renderResult(r){
  document.getElementById("resultMeta").textContent=`${r.candidate} • ${r.phone} • Test #${r.testNo} • ${r.date}`;
- document.getElementById("metrics").innerHTML=[["Final Score",r.score.toFixed(2)+"/50"],["Percentage",r.pct.toFixed(1)+"%"],["Correct",r.correct],["Wrong / Unanswered",r.wrong+" / "+r.unanswered]].map(x=>`<div class="metric"><span>${x[0]}</span><b>${x[1]}</b></div>`).join("");
+ document.getElementById("metrics").innerHTML=[["Final Score",r.score.toFixed(2)+"/50"],["Percentage",r.pct.toFixed(1)+"%"],["Correct",r.correct],["Wrong / Unanswered",r.wrong+" / "+r.unanswered],["Negative Mark",r.negative.toFixed(2)]].map(x=>`<div class="metric"><span>${x[0]}</span><b>${x[1]}</b></div>`).join("");
  const rd=readiness(r.pct);document.getElementById("readiness").innerHTML=`<p><b>${rd[0]}</b> — ${rd[1]}</p>`;
  const cats=[...new Set(state.items.map(q=>q.category))];
  document.getElementById("subject").innerHTML=cats.map(c=>{let arr=state.items.filter(q=>q.category===c);let ok=arr.filter(q=>r.items[state.items.indexOf(q)].selected===q.answer).length;let pc=ok/10*100;return `<p><b>${c}</b> — ${ok}/10 (${pc.toFixed(0)}%)</p><div class="bar"><i style="width:${pc}%"></i></div>`}).join("");
